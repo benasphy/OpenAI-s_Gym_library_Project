@@ -4,10 +4,18 @@ import matplotlib.pyplot as plt
 import pickle
 
 
-def train(episodes, is_8x8=False, q_table=None):
+def _greedy_action(q_row, rng, random_tiebreak=False):
+    if not random_tiebreak:
+        return int(np.argmax(q_row))
+    max_q = np.max(q_row)
+    max_actions = np.flatnonzero(np.isclose(q_row, max_q))
+    return int(rng.choice(max_actions))
+
+
+def train(episodes, is_8x8=False, is_slippery=True, q_table=None):
     """Training mode: Uses epsilon-greedy exploration and updates Q-table"""
     map_name = "8x8" if is_8x8 else "4x4"
-    env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=False)
+    env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=is_slippery)
     
     # Initialize Q-table if not provided
     q = q_table if q_table is not None else np.zeros((env.observation_space.n, env.action_space.n))
@@ -16,10 +24,16 @@ def train(episodes, is_8x8=False, q_table=None):
     learning_rate_a = 0.3 if is_8x8 else 0.8
     discount_factor_g = 0.95
     
-    # Exploration schedule - improved for less noise
+    # Exploration schedule:
+    # - Keep existing behavior for deterministic mode.
+    # - Use slower decay and higher min epsilon for slippery mode.
     epsilon = 1.0
-    epsilon_decay_rate = 0.0001 if is_8x8 else 0.0005
-    min_epsilon = 0.01
+    if is_slippery:
+        epsilon_decay_rate = 0.00003 if is_8x8 else 0.00015
+        min_epsilon = 0.05 if is_8x8 else 0.02
+    else:
+        epsilon_decay_rate = 0.0001 if is_8x8 else 0.0005
+        min_epsilon = 0.01
     rng = np.random.default_rng()
     
     rewards_per_episode = np.zeros(episodes)
@@ -42,7 +56,7 @@ def train(episodes, is_8x8=False, q_table=None):
             if rng.random() < epsilon:
                 action = env.action_space.sample()
             else:
-                action = np.argmax(q[state,:])
+                action = _greedy_action(q[state,:], rng, random_tiebreak=is_slippery)
                 
             new_state, reward, terminated, truncated, _ = env.step(action)
             steps += 1
@@ -70,10 +84,16 @@ def train(episodes, is_8x8=False, q_table=None):
     return q, rewards_per_episode, steps_per_episode
 
 
-def test(episodes, q_table, is_8x8=False, render=False):
-    """Inference mode: Uses learned Q-table (100% exploitation, NO updates)"""
+def test(episodes, q_table, is_8x8=False, is_slippery=True, render=False, eval_epsilon=None):
+    """Inference mode: Uses learned Q-table with optional tiny epsilon for slippery mode."""
     map_name = "8x8" if is_8x8 else "4x4"
-    env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=False, render_mode='human' if render else None)
+    env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=is_slippery, render_mode='human' if render else None)
+
+    # Keep existing deterministic behavior by default.
+    # For slippery mode, a tiny eval epsilon can reduce local looping.
+    if eval_epsilon is None:
+        eval_epsilon = 0.01 if is_slippery else 0.0
+    rng = np.random.default_rng()
     
     q = q_table.copy()
     
@@ -88,8 +108,10 @@ def test(episodes, q_table, is_8x8=False, render=False):
         steps = 0
         
         while not terminated and not truncated and steps < 500:
-            # INFERENCE MODE: 100% exploitation (follow Q-table only)
-            action = np.argmax(q[state,:])  # No randomness, pure Q-table
+            if rng.random() < eval_epsilon:
+                action = env.action_space.sample()
+            else:
+                action = _greedy_action(q[state,:], rng, random_tiebreak=is_slippery)
             
             new_state, reward, terminated, truncated, _ = env.step(action)
             steps += 1
@@ -105,12 +127,20 @@ def test(episodes, q_table, is_8x8=False, render=False):
     return rewards_per_episode, steps_per_episode
 
 
-def run(episodes, is_8x8=False, render=False):
+def run(episodes, is_8x8=False, is_slippery=False, render=False, eval_epsilon=None):
     """Run complete training and testing pipeline"""
-    q, rewards_train, steps_train = train(episodes, is_8x8=is_8x8)
+    q, rewards_train, steps_train = train(episodes, is_8x8=is_8x8, is_slippery=is_slippery)
     print(f"Training complete. Testing learned policy on {episodes} episodes...")
-    rewards_test, steps_test = test(episodes, q, is_8x8=is_8x8, render=render)
-    visualize_results(rewards_train, steps_train, q, f"{'8x8' if is_8x8 else '4x4'} FrozenLake")
+    rewards_test, steps_test = test(
+        episodes,
+        q,
+        is_8x8=is_8x8,
+        is_slippery=is_slippery,
+        render=render,
+        eval_epsilon=eval_epsilon,
+    )
+    mode = "slippery" if is_slippery else "deterministic"
+    visualize_results(rewards_train, steps_train, q, f"{'8x8' if is_8x8 else '4x4'} FrozenLake ({mode})")
 
 
 def visualize_results(rewards_per_episode, steps_per_episode, q, title="Training Results"):
@@ -173,12 +203,27 @@ def visualize_results(rewards_per_episode, steps_per_episode, q, title="Training
 
 
 if __name__ == "__main__":
-    print("Training on 8x8 FrozenLake...")
-    q, rewards_train, steps_train = train(50000, is_8x8=True)
+    is_8x8 = True
+    is_slippery = True
+
+    # Keep existing strategy for deterministic mode.
+    # Use more episodes when slippery mode is enabled.
+    episodes = 150000 if is_slippery and is_8x8 else 50000
+
+    print(f"Training on {'8x8' if is_8x8 else '4x4'} FrozenLake | slippery={is_slippery}...")
+    q, rewards_train, steps_train = train(episodes, is_8x8=is_8x8, is_slippery=is_slippery)
     print("Training complete. Visualizing...")
-    visualize_results(rewards_train, steps_train, q, "8x8 FrozenLake")
+    mode = "slippery" if is_slippery else "deterministic"
+    visualize_results(rewards_train, steps_train, q, f"{'8x8' if is_8x8 else '4x4'} FrozenLake ({mode})")
     print("\nRunning 10 episodes with rendering using learned Q-table...")
-    test(10, q, is_8x8=True, render=True)
+    test(
+        10,
+        q,
+        is_8x8=is_8x8,
+        is_slippery=is_slippery,
+        render=True,
+        eval_epsilon=(0.01 if is_slippery else 0.0),
+    )
         
         
     
