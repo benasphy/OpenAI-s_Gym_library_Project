@@ -1,9 +1,3 @@
-"""
-
-    - For render_mode=human, this script does NOT sleep by default (max speed).
-    - If you want slower playback, pass --throttle-fps 60 (or 30).
-"""
-
 import argparse
 import pickle
 import sys
