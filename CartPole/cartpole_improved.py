@@ -1,7 +1,4 @@
 """
-Install (use the workspace venv explicitly):
-  - ./.venv/bin/python -m pip install "gymnasium[classic-control]" numpy
-
 Run (fast defaults):
     - Demo render (auto-loads saved model if present; otherwise trains once):
             ./.venv/bin/python CartPole/cartpole_improved.py --render-mode human --hold
