@@ -1,9 +1,4 @@
 """
-Why ARS?
-  - No Torch / stable-baselines3 dependency (works cleanly on Python 3.13)
-  - Learns a strong policy quickly for CartPole-v1
-  - Uses Gymnasium's native "human" renderer for smooth visuals
-
 Install (use the workspace venv explicitly):
   - ./.venv/bin/python -m pip install "gymnasium[classic-control]" numpy
 
