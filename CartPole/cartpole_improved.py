@@ -1,17 +1,5 @@
 """
-Run (fast defaults):
-    - Demo render (auto-loads saved model if present; otherwise trains once):
-            ./.venv/bin/python CartPole/cartpole_improved.py --render-mode human --hold
-    - Force training:
-            ./.venv/bin/python CartPole/cartpole_improved.py --train
-    - Stress test (no rendering):
-            ./.venv/bin/python CartPole/cartpole_improved.py --stress --stress-episodes 500
-      - Sweep max steps to see limits:
-          ./.venv/bin/python CartPole/cartpole_improved.py --sweep --sweep-steps 500,1000,5000,20000,100000 --sweep-episodes 50
-      - Run a single very long episode (stop on failure):
-          ./.venv/bin/python CartPole/cartpole_improved.py --until-fail --max-episode-steps 200000 --render-mode none
 
-Speed tips:
     - For render_mode=human, this script does NOT sleep by default (max speed).
     - If you want slower playback, pass --throttle-fps 60 (or 30).
 """
