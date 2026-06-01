@@ -1,5 +1,4 @@
-"""CartPole solved with ARS (NumPy) + fast Gymnasium rendering.
-
+"""
 Why ARS?
   - No Torch / stable-baselines3 dependency (works cleanly on Python 3.13)
   - Learns a strong policy quickly for CartPole-v1
